@@ -2,9 +2,12 @@ networks:
   allservices:
     external: true
 
+volumes:
+  minio_data:
+
 services:
   loki:
-    image: grafana/loki:2.7.1
+    image: grafana/loki:3.0.1
     command: "-config.file=/etc/loki/config.yaml"
     ports:
       - 3200
@@ -14,16 +17,29 @@ services:
       - ./loki-config.yaml:/etc/loki/config.yaml
     depends_on:
       - minio
-      - miniocfg
     healthcheck:
       test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3200/ready || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks: &loki-dns
-      allservices:
-        aliases:
-          - loki
+    networks:
+      - allservices
+
+  mimir:
+    image: grafana/mimir:2.13.0
+    command: "-config.file=/etc/mimir.yaml"
+    ports:
+      - 8080
+      - 7946
+      - 9095
+    depends_on:
+      - minio
+    deploy:
+      replicas: 3
+    volumes:
+      - ./mimir-config.yaml:/etc/mimir.yaml
+    networks:
+      - allservices
 
   # MINIO provides a local s3 API for backing storage.
   minio:
@@ -34,39 +50,23 @@ services:
       - |
         mkdir -p /data/loki-data && \
         mkdir -p /data/loki-ruler && \
+        mkdir -p /data/mimir-data && \
         minio server /data
     environment:
-      - MINIO_ROOT_USER=admin
-      - MINIO_ROOT_PASSWORD=password
+      # Use the user/pass as key/secret.
+      - MINIO_ROOT_USER=s3key
+      - MINIO_ROOT_PASSWORD=s3secret
       - MINIO_PROMETHEUS_AUTH_TYPE=public
       - MINIO_UPDATE=off
     ports:
       - 9000
     volumes:
-      - ./.dataloki/minio:/data
+      - minio_data:/data
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 15s
       timeout: 20s
       retries: 5
-    networks:
-      - allservices
-
-  # MINIO cannot configure access keys until _after_ it is running...
-  miniocfg:
-    image: minio/mc
-    restart: "no"
-    depends_on:
-      - minio
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-          until (mc config host add minio http://minio:9000 admin password) do echo '...waiting...' && sleep 1; done;
-          mc admin user svcacct add minio admin --access-key s3key --secret-key s3secret
-          # Mimir won't create the bucket itself...
-          mc mb minio/mimir-data
-          exit 0;
     networks:
       - allservices
 
@@ -110,25 +110,6 @@ services:
       - "3100:3100"
     networks:
       - allservices
-
-  mimir:
-    image: grafana/mimir:2.5.0
-    command: "-config.file=/etc/mimir.yaml"
-    ports:
-      - 8080
-      - 7946
-      - 9095
-    depends_on:
-      - minio
-      - miniocfg
-    deploy:
-      replicas: 3
-    volumes:
-      - ./mimir-config.yaml:/etc/mimir.yaml
-    networks: &mimir-dns
-      allservices:
-        aliases:
-          - mimir
 
   gatewaymimir:
     image: nginx:latest
