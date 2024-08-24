@@ -13,11 +13,11 @@ common:
   storage:
     backend: s3
     s3:
-      endpoint: miniomimir:9000
+      endpoint: minio:9000
       insecure: true
-      access_key_id: mimir
-      secret_access_key: supersecret
-      bucket_name: mimir
+      access_key_id: s3key
+      secret_access_key: s3secret
+      bucket_name: mimir-data
 alertmanager:
   external_url: http://localhost:9009/alertmanager
 blocks_storage:

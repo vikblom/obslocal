@@ -1,5 +1,3 @@
-version: "3.8"
-
 networks:
   allservices:
     external: true
@@ -15,7 +13,8 @@ services:
     volumes:
       - ./loki-config.yaml:/etc/loki/config.yaml
     depends_on:
-      - minioloki
+      - minio
+      - miniocfg
     healthcheck:
       test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3200/ready || exit 1" ]
       interval: 10s
@@ -26,7 +25,8 @@ services:
         aliases:
           - loki
 
-  minioloki:
+  # MINIO provides a local s3 API for backing storage.
+  minio:
     image: minio/minio
     entrypoint:
       - sh
@@ -36,8 +36,8 @@ services:
         mkdir -p /data/loki-ruler && \
         minio server /data
     environment:
-      - MINIO_ACCESS_KEY=loki
-      - MINIO_SECRET_KEY=supersecret
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password
       - MINIO_PROMETHEUS_AUTH_TYPE=public
       - MINIO_UPDATE=off
     ports:
@@ -52,10 +52,28 @@ services:
     networks:
       - allservices
 
+  # MINIO cannot configure access keys until _after_ it is running...
+  miniocfg:
+    image: minio/mc
+    restart: "no"
+    depends_on:
+      - minio
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+          until (mc config host add minio http://minio:9000 admin password) do echo '...waiting...' && sleep 1; done;
+          mc admin user svcacct add minio admin --access-key s3key --secret-key s3secret
+          # Mimir won't create the bucket itself...
+          mc mb minio/mimir-data
+          exit 0;
+    networks:
+      - allservices
+
   gatewayloki:
     image: nginx:latest
     depends_on:
-      - loki 
+      - loki
     entrypoint:
       - sh
       - -euc
@@ -93,17 +111,6 @@ services:
     networks:
       - allservices
 
-  promtail:
-    image: grafana/promtail:2.7.1
-    command: -config.file=/etc/promtail/config.yaml
-    volumes:
-      - ./promtail.yaml:/etc/promtail/config.yaml
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - gatewayloki
-    networks:
-      - allservices
-
   mimir:
     image: grafana/mimir:2.5.0
     command: "-config.file=/etc/mimir.yaml"
@@ -112,37 +119,16 @@ services:
       - 7946
       - 9095
     depends_on:
-      - miniomimir
+      - minio
+      - miniocfg
+    deploy:
+      replicas: 3
     volumes:
       - ./mimir-config.yaml:/etc/mimir.yaml
     networks: &mimir-dns
       allservices:
         aliases:
           - mimir
-
-  miniomimir:
-    image: minio/minio
-    entrypoint:
-      - sh
-      - -euc
-      - |
-        mkdir -p /data/mimir && \
-        minio server /data
-    environment:
-      - MINIO_ROOT_USER=mimir
-      - MINIO_ROOT_PASSWORD=supersecret
-      - MINIO_UPDATE=off
-    ports:
-      - 9000
-    volumes:
-      - ./.datamimir/minio:/data
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 15s
-      timeout: 20s
-      retries: 5
-    networks:
-      - allservices
 
   gatewaymimir:
     image: nginx:latest
@@ -183,6 +169,17 @@ services:
     networks:
       - allservices
 
+  promtail:
+    image: grafana/promtail:2.7.1
+    command: -config.file=/etc/promtail/config.yaml
+    volumes:
+      - ./promtail.yaml:/etc/promtail/config.yaml
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - gatewayloki
+    networks:
+      - allservices
+
   prometheus:
     image: prom/prometheus:v2.41.0
     command:
@@ -196,7 +193,7 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
-      - allservices 
+      - allservices
 
   grafana:
     image: grafana/grafana:latest
@@ -243,4 +240,4 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - allservices 
+      - allservices
