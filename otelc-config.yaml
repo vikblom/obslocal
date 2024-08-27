@@ -1,0 +1,128 @@
+# Tested with OpenTelemetry Collector Contrib v0.98.0
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  # hostmetrics:
+  #   collection_interval: 30s
+  #   scrapers:
+  #     cpu:
+  #     load:
+  #     memory:
+  #     disk:
+  #     filesystem:
+  #     network:
+  # prometheus:
+  #   config:
+  #     global:
+  #       scrape_interval: 60s
+  #     scrape_configs:
+  #       # otel-collector internal metrics
+  #       - job_name: otel-collector
+  #         static_configs:
+  #         - targets:
+  #             - localhost:8888
+  #           labels:
+  #             job_name: otel-collector
+
+processors:
+  batch:
+    send_batch_size: 10000
+    send_batch_max_size: 11000
+    timeout: 10s
+  resourcedetection:
+    # Enriches telemetry data with resource information from the host
+    # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor
+    detectors: ["env", "system"]
+    override: false
+  transform/drop_unneeded_resource_attributes:
+    # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor
+    error_mode: ignore
+    trace_statements:
+      - context: resource
+        statements:
+          - delete_key(attributes, "k8s.pod.start_time")
+          - delete_key(attributes, "os.description")
+          - delete_key(attributes, "os.type")
+          - delete_key(attributes, "process.command_args")
+          - delete_key(attributes, "process.executable.path")
+          - delete_key(attributes, "process.pid")
+          - delete_key(attributes, "process.runtime.description")
+          - delete_key(attributes, "process.runtime.name")
+          - delete_key(attributes, "process.runtime.version")
+    metric_statements:
+      - context: resource
+        statements:
+          - delete_key(attributes, "k8s.pod.start_time")
+          - delete_key(attributes, "os.description")
+          - delete_key(attributes, "os.type")
+          - delete_key(attributes, "process.command_args")
+          - delete_key(attributes, "process.executable.path")
+          - delete_key(attributes, "process.pid")
+          - delete_key(attributes, "process.runtime.description")
+          - delete_key(attributes, "process.runtime.name")
+          - delete_key(attributes, "process.runtime.version")
+    log_statements:
+      - context: resource
+        statements:
+          - delete_key(attributes, "k8s.pod.start_time")
+          - delete_key(attributes, "os.description")
+          - delete_key(attributes, "os.type")
+          - delete_key(attributes, "process.command_args")
+          - delete_key(attributes, "process.executable.path")
+          - delete_key(attributes, "process.pid")
+          - delete_key(attributes, "process.runtime.description")
+          - delete_key(attributes, "process.runtime.name")
+          - delete_key(attributes, "process.runtime.version")
+  transform/add_resource_attributes_as_metric_attributes:
+    # https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor
+    error_mode: ignore
+    metric_statements:
+      - context: datapoint
+        statements:
+          - set(attributes["deployment.environment"], resource.attributes["deployment.environment"])
+          - set(attributes["service.version"], resource.attributes["service.version"])
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  zpages:
+    endpoint: 0.0.0.0:55679
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+exporters:
+  otlphttp/grafana:
+    endpoint: http://localhost:3100/otlp
+  otlphttp/signoz:
+    endpoint: http:/localhost:5318
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors:
+        [resourcedetection, transform/drop_unneeded_resource_attributes, batch]
+      exporters: [otlphttp/grafana, otlphttp/signoz]
+    metrics:
+      receivers: [otlp]
+      processors:
+        [
+          resourcedetection,
+          transform/drop_unneeded_resource_attributes,
+          transform/add_resource_attributes_as_metric_attributes,
+          batch,
+        ]
+      exporters: [otlphttp/grafana, otlphttp/signoz]
+    logs:
+      receivers: [otlp]
+      processors:
+        [
+          resourcedetection,
+          transform/drop_unneeded_resource_attributes,
+          batch,
+        ]
+      exporters: [otlphttp/grafana, otlphttp/signoz]
