@@ -9,6 +9,7 @@ server:
   http_server_read_timeout: 10m
   http_server_write_timeout: 10m
   http_server_idle_timeout: 10m
+  log_level: warn
 memberlist:
   join_members:
     [mimir:7946]

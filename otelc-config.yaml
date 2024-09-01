@@ -95,18 +95,26 @@ extensions:
     endpoint: 0.0.0.0:1777
 
 exporters:
-  otlphttp/grafana:
+  otlphttp/logs:
     endpoint: http://localhost:3100/otlp
+  otlphttp/metrics:
+    endpoint: http://localhost:9009/otlp
+  otlphttp/traces:
+    endpoint: http://localhost:3302
   # otlphttp/signoz:
   #   endpoint: http:/localhost:5318
 
 service:
   pipelines:
-    traces:
+    logs:
       receivers: [otlp]
       processors:
-        [resourcedetection, transform/drop_unneeded_resource_attributes, batch]
-      exporters: [otlphttp/grafana]
+        [
+          resourcedetection,
+          transform/drop_unneeded_resource_attributes,
+          batch,
+        ]
+      exporters: [otlphttp/logs]
     metrics:
       receivers: [otlp]
       processors:
@@ -116,13 +124,9 @@ service:
           transform/add_resource_attributes_as_metric_attributes,
           batch,
         ]
-      exporters: [otlphttp/grafana]
-    logs:
+      exporters: [otlphttp/metrics]
+    traces:
       receivers: [otlp]
       processors:
-        [
-          resourcedetection,
-          transform/drop_unneeded_resource_attributes,
-          batch,
-        ]
-      exporters: [otlphttp/grafana]
+        [resourcedetection, transform/drop_unneeded_resource_attributes, batch]
+      exporters: [otlphttp/traces]

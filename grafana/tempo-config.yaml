@@ -1,0 +1,98 @@
+# For more information on this configuration, see the complete reference guide at
+# https://grafana.com/docs/tempo/latest/configuration/
+
+multitenancy_enabled: false
+
+# Enables result streaming from Tempo (to Grafana) via HTTP.
+stream_over_http_enabled: true
+
+server:
+  http_listen_port: 3300
+
+memberlist:
+  join_members:
+    - tempo:7946
+
+# The distributor receives incoming trace span data for the system.
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+        http:
+  # Forwarder?
+
+# The ingester receives data from the distributor and processes it into indices and blocks.
+ingester:
+  trace_idle_period: 10s       # The length of time after a trace has not received spans to consider it complete and flush it.
+  max_block_bytes: 1_000_000   # Cut the head block when it hits this size or
+  max_block_duration: 5m       # this much time passes
+
+# The compactor block configures the compactor responsible for compacting TSDB blocks.
+compactor:
+  compaction:
+    compaction_window: 1h              # Blocks in this time window will be compacted together.
+    max_block_bytes: 100_000_000       # Maximum size of a compacted block.
+    block_retention: 1h                # How long to keep blocks. Default is 14 days, this demo system is short-lived.
+    compacted_block_retention: 10m     # How long to keep compacted blocks stored elsewhere.
+
+# Configuration block to determine where to store TSDB blocks.
+storage:
+  trace:
+    backend: s3
+    s3:
+      endpoint: minio:9000
+      bucket: tempo-data
+      insecure: true
+      access_key: s3key
+      secret_key: s3secret
+      forcepathstyle: true
+    block:
+      bloom_filter_false_positive: .05
+    wal:
+      path: /tmp/tempo/wal
+    pool:
+      max_workers: 100
+      queue_depth: 10000
+
+# Configures the metrics generator component of Tempo.
+metrics_generator:
+  # Specifies which processors to use.
+  processor:
+    # Span metrics create metrics based on span type, duration, name and service.
+    span_metrics:
+        # Configure extra dimensions to add as metric labels.
+        dimensions:
+          - http.method
+          - http.target
+          - http.status_code
+          - service.version
+    # Service graph metrics create node and edge metrics for determinng service interactions.
+    service_graphs:
+        # Configure extra dimensions to add as metric labels.
+        dimensions:
+          - http.method
+          - http.target
+          - http.status_code
+          - service.version
+  # The registry configuration determines how to process metrics.
+  registry:
+    collection_interval: 5s                 # Create new metrics every 5s.
+    # Configure extra labels to be added to metrics.
+    external_labels:
+      source: tempo                         # Add a `{source="tempo"}` label.
+      group: 'mythical'                     # Add a `{group="mythical"}` label.
+  # Configures where the store for metrics is located.
+  storage:
+    # WAL for metrics generation.
+    path: /tmp/tempo/generator/wal
+    # Where to remote write metrics to.
+    remote_write:
+      - url: http://mimir:9009/api/v1/push  # URL of locally running Mimir instance.
+        send_exemplars: true # Send exemplars along with their metrics.
+  traces_storage:
+    path: /tmp/tempo/generator/traces
+
+# Global override configuration.
+overrides:
+  metrics_generator_processors: ['service-graphs', 'span-metrics','local-blocks'] # The types of metrics generation to enable for each tenant.

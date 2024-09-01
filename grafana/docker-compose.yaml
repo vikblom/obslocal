@@ -11,7 +11,7 @@ services:
     command: "-config.file=/etc/loki/config.yaml"
     ports:
       - 3200
-      - 7946
+      - 7946 # membership
       - 9095
     volumes:
       - ./loki-config.yaml:/etc/loki/config.yaml
@@ -22,6 +22,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      logging: promtail
     networks:
       - allservices
 
@@ -30,20 +32,41 @@ services:
     command: "-config.file=/etc/mimir.yaml"
     ports:
       - 8080
-      - 7946
+      - 7946 # membership
       - 9095
     depends_on:
       - minio
     deploy:
       replicas: 3
+    labels:
+      logging: promtail
     volumes:
       - ./mimir-config.yaml:/etc/mimir.yaml
+    networks:
+      - allservices
+
+  tempo:
+    image: grafana/tempo:2.5.0
+    ports:
+      - 3300:3300
+      - 3301:4317 # grpc ingest
+      - 3302:4318 # http ingest
+      - 7946 # membership
+      # - "55680:55680"
+      # - "55681:55681"
+      # - "14250:14250"
+    depends_on:
+      - minio
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - "./tempo-config.yaml:/etc/tempo.yaml"
     networks:
       - allservices
 
   # MINIO provides a local s3 API for backing storage.
   minio:
     image: minio/minio
+    # Create the buckets.
     entrypoint:
       - sh
       - -euc
@@ -51,6 +74,7 @@ services:
         mkdir -p /data/loki-data && \
         mkdir -p /data/loki-ruler && \
         mkdir -p /data/mimir-data && \
+        mkdir -p /data/tempo-data && \
         minio server /data
     environment:
       # Use the user/pass as key/secret.
@@ -177,7 +201,9 @@ services:
       - allservices
 
   grafana:
-    image: grafana/grafana:latest
+    # 11.2.0 still has
+    # https://github.com/grafana/grafana/issues/90430
+    image: grafana/grafana:11.2.0
     environment:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
       - GF_AUTH_ANONYMOUS_ENABLED=true
@@ -185,39 +211,19 @@ services:
       - GF_USERS_DEFAULT_THEME=light
       - GF_LOG_MODE=console
       - GF_LOG_LEVEL=critical
-    entrypoint:
-      - sh
-      - -euc
-      - |
-        mkdir -p /etc/grafana/provisioning/datasources
-        cat <<EOF > /etc/grafana/provisioning/datasources/ds.yaml
-        apiVersion: 1
-        datasources:
-          - name: Loki
-            type: loki
-            access: proxy
-            url: http://gatewayloki:3100
-            jsonData:
-              httpHeaderName1: "X-Scope-OrgID"
-            secureJsonData:
-              httpHeaderValue1: "lokilocal"
-          - name: Mimir
-            type: prometheus
-            url: http://gatewaymimir:9009/prometheus
-            jsonData:
-              httpHeaderName1: "X-Scope-OrgID"
-            secureJsonData:
-              httpHeaderValue1: "mimirlocal"
-        EOF
-        /run.sh
+    volumes:
+      - ./grafana.yaml:/etc/grafana/provisioning/datasources/ds.yaml
     depends_on:
       - gatewayloki
       - gatewaymimir
+      - tempo
     healthcheck:
       test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      logging: promtail
     ports:
       - "3000:3000"
     networks:
