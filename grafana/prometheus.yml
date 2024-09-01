@@ -8,7 +8,7 @@ global:
     namespace: demo
 
 remote_write:
-  - url: http://gatewaymimir:9009/api/v1/push
+  - url: http://caddy:3200/api/v1/push
     headers:
       X-Scope-OrgID: mimirlocal
 
@@ -22,4 +22,4 @@ scrape_configs:
     scrape_interval: 5s
 
     static_configs:
-      - targets: ['localhost:9090', 'localhost:3100', 'localhost:9009']
+      - targets: ['localhost:3300', 'localhost:3100', 'localhost:3200']

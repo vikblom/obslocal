@@ -3,7 +3,7 @@ datasources:
   - name: Loki
     type: loki
     access: proxy
-    url: http://gatewayloki:3100
+    url: http://caddy:3100
     jsonData:
       derivedFields:
         - datasourceName: Tempo
@@ -16,14 +16,14 @@ datasources:
       httpHeaderValue1: "lokilocal"
   - name: Mimir
     type: prometheus
-    url: http://gatewaymimir:9009/prometheus
+    url: http://caddy:3200/prometheus
     secureJsonData:
       httpHeaderValue1: "mimirlocal"
   - name: Tempo
     type: tempo
     access: proxy
     uid: tempo
-    url: http://tempo:3300
+    url: http://caddy:3300
     jsonData:
       nodeGraph:
         enabled: true

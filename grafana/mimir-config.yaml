@@ -4,8 +4,7 @@ target: all,alertmanager,overrides-exporter
 multitenancy_enabled: false
 
 server:
-  http_listen_port: 8080
-  grpc_listen_port: 9095
+  http_listen_port: 3200
   http_server_read_timeout: 10m
   http_server_write_timeout: 10m
   http_server_idle_timeout: 10m
@@ -23,7 +22,7 @@ common:
       secret_access_key: s3secret
       bucket_name: mimir-data
 alertmanager:
-  external_url: http://localhost:9009/alertmanager
+  external_url: http://localhost:3200/alertmanager
 blocks_storage:
   storage_prefix: blocks
 ruler_storage:

@@ -98,7 +98,7 @@ exporters:
   otlphttp/logs:
     endpoint: http://localhost:3100/otlp
   otlphttp/metrics:
-    endpoint: http://localhost:9009/otlp
+    endpoint: http://localhost:3200/otlp
   otlphttp/traces:
     endpoint: http://localhost:3302
   # otlphttp/signoz:

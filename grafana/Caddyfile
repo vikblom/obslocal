@@ -1,0 +1,37 @@
+# Loki
+:3100 {
+    reverse_proxy loki:3100 {
+        health_uri /ready
+        health_interval 30s
+        health_timeout 5s
+        health_status 200
+    }
+}
+
+# Mimir
+:3200 {
+    reverse_proxy mimir:3200 {
+        health_uri /ready
+        health_interval 30s
+        health_timeout 5s
+        health_status 200
+    }
+}
+
+# Tempo
+:3300 {
+    reverse_proxy tempo:3300 {
+        health_uri /ready
+        health_interval 30s
+        health_timeout 5s
+        health_status 200
+    }
+}
+:3301 {
+    reverse_proxy tempo:4317 {
+    }
+}
+:3302 {
+    reverse_proxy tempo:4318 {
+    }
+}

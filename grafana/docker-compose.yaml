@@ -4,21 +4,22 @@ networks:
 
 volumes:
   minio_data:
+  caddy_data:
 
 services:
   loki:
     image: grafana/loki:3.0.1
     command: "-config.file=/etc/loki/config.yaml"
     ports:
-      - 3200
+      - 3100 # http
+      - 9095 # grpc
       - 7946 # membership
-      - 9095
     volumes:
       - ./loki-config.yaml:/etc/loki/config.yaml
     depends_on:
       - minio
     healthcheck:
-      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3200/ready || exit 1" ]
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,11 +32,16 @@ services:
     image: grafana/mimir:2.13.0
     command: "-config.file=/etc/mimir.yaml"
     ports:
-      - 8080
-      - 7946 # membership
+      - 3200
       - 9095
+      - 7946 # membership
     depends_on:
       - minio
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3200/ready || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       replicas: 3
     labels:
@@ -48,9 +54,9 @@ services:
   tempo:
     image: grafana/tempo:2.5.0
     ports:
-      - 3300:3300
-      - 3301:4317 # grpc ingest
-      - 3302:4318 # http ingest
+      - 3300
+      - 4317 # grpc ingest
+      - 4318 # http ingest
       - 7946 # membership
       # - "55680:55680"
       # - "55681:55681"
@@ -94,83 +100,20 @@ services:
     networks:
       - allservices
 
-  gatewayloki:
-    image: nginx:latest
+  caddy:
+    image: caddy:2-alpine
+    volumes:
+      - caddy_data:/data
+      - ./Caddyfile:/etc/caddy/Caddyfile
     depends_on:
       - loki
-    entrypoint:
-      - sh
-      - -euc
-      - |
-        cat <<EOF > /etc/nginx/nginx.conf
-        user  nginx;
-        worker_processes  16;  ## Default: 1
-
-        events {
-          worker_connections   1000;
-        }
-
-        http {
-          resolver 127.0.0.11;
-          upstream backend {
-            server loki:3200 max_fails=1 fail_timeout=1s;
-          }
-          server {
-            listen 3100;
-            access_log /dev/null;
-            location / {
-                proxy_pass http://backend;
-            }
-          }
-        }
-        EOF
-        /docker-entrypoint.sh nginx -g "daemon off;"
-    healthcheck:
-      test: ["CMD", "service", "nginx", "status"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - mimir
+      - tempo
     ports:
-      - "3100:3100"
-    networks:
-      - allservices
-
-  gatewaymimir:
-    image: nginx:latest
-    entrypoint:
-      - sh
-      - -euc
-      - |
-        cat <<EOF > /etc/nginx/nginx.conf
-        user  nginx;
-        worker_processes  16;  ## Default: 1
-        events {
-          worker_connections 1024;
-        }
-        http {
-          resolver 127.0.0.11;
-          upstream backend {
-            server mimir:8080 max_fails=1 fail_timeout=1s;
-          }
-          server {
-            listen 9009;
-            access_log /dev/null;
-            location / {
-                proxy_pass http://backend;
-            }
-          }
-        }
-        EOF
-        /docker-entrypoint.sh nginx -g "daemon off;"
-    depends_on:
-      - "mimir"
-    ports:
-      - 9009:9009
-    healthcheck:
-      test: ["CMD", "service", "nginx", "status"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "3100:3100" # Loki
+      - "3200:3200" # Mimir
+      - "3301:3301" # Tempo
+      - "3302:3302"
     networks:
       - allservices
 
@@ -181,7 +124,7 @@ services:
       - ./promtail.yaml:/etc/promtail/config.yaml
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      - gatewayloki
+      - caddy
     networks:
       - allservices
 
@@ -214,9 +157,7 @@ services:
     volumes:
       - ./grafana.yaml:/etc/grafana/provisioning/datasources/ds.yaml
     depends_on:
-      - gatewayloki
-      - gatewaymimir
-      - tempo
+      - caddy
     healthcheck:
       test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1" ]
       interval: 10s
