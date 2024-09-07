@@ -10,6 +10,7 @@ services:
   loki:
     image: grafana/loki:3.0.1
     command: "-config.file=/etc/loki/config.yaml"
+    restart: on-failure
     ports:
       - 3100 # http
       - 9095 # grpc
@@ -31,6 +32,7 @@ services:
   mimir:
     image: grafana/mimir:2.13.0
     command: "-config.file=/etc/mimir.yaml"
+    restart: on-failure
     ports:
       - 3200
       - 9095
@@ -53,6 +55,8 @@ services:
 
   tempo:
     image: grafana/tempo:2.5.0
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    restart: on-failure
     ports:
       - 3300
       - 4317 # grpc ingest
@@ -63,7 +67,6 @@ services:
       # - "14250:14250"
     depends_on:
       - minio
-    command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - "./tempo-config.yaml:/etc/tempo.yaml"
     networks:
@@ -81,7 +84,8 @@ services:
         mkdir -p /data/loki-ruler && \
         mkdir -p /data/mimir-data && \
         mkdir -p /data/tempo-data && \
-        minio server /data
+        minio server /data --console-address :9001
+    restart: on-failure
     environment:
       # Use the user/pass as key/secret.
       - MINIO_ROOT_USER=s3key
@@ -90,6 +94,7 @@ services:
       - MINIO_UPDATE=off
     ports:
       - 9000
+      - 9001:9001
     volumes:
       - minio_data:/data
     healthcheck:
@@ -102,6 +107,7 @@ services:
 
   caddy:
     image: caddy:2-alpine
+    restart: on-failure
     volumes:
       - caddy_data:/data
       - ./Caddyfile:/etc/caddy/Caddyfile
@@ -140,6 +146,8 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - caddy
     networks:
       - allservices
 
