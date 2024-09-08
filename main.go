@@ -39,6 +39,9 @@ func run(ctx context.Context) error {
 	//
 	// Create a logger provider.
 	// You can pass this instance directly when creating bridges.
+	//
+	// Note that Zerolog is not supported out-of-the-box by otel:
+	// https://github.com/open-telemetry/opentelemetry-go-contrib/issues/5405#issuecomment-2276271236
 	exporter, err := otlploghttp.New(ctx, otlploghttp.WithInsecure())
 	if err != nil {
 		panic(err)

@@ -8,3 +8,5 @@ services:
       - ./otelc-config.yaml:/etc/otel-collector-config.yaml
     # All the ports are visible.
     network_mode: "host"
+    environment:
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}

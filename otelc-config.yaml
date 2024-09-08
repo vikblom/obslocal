@@ -94,15 +94,22 @@ extensions:
   pprof:
     endpoint: 0.0.0.0:1777
 
-exporters:
-  otlphttp/logs:
-    endpoint: http://localhost:3100/otlp
-  otlphttp/metrics:
-    endpoint: http://localhost:3200/otlp
-  otlphttp/traces:
-    endpoint: http://localhost:3302
+# exporters:
+#   otlphttp/logs:
+#     endpoint: http://localhost:3100/otlp
+#   otlphttp/metrics:
+#     endpoint: http://localhost:3200/otlp
+#   otlphttp/traces:
+#     endpoint: http://localhost:3302
   # otlphttp/signoz:
   #   endpoint: http:/localhost:5318
+
+exporters:
+  otlphttp:
+    endpoint: https://otlp.eu01.nr-data.net
+    headers:
+      api-key: ${env:NEW_RELIC_LICENSE_KEY}
+
 
 service:
   pipelines:
@@ -114,7 +121,7 @@ service:
           transform/drop_unneeded_resource_attributes,
           batch,
         ]
-      exporters: [otlphttp/logs]
+      exporters: [otlphttp]
     metrics:
       receivers: [otlp]
       processors:
@@ -124,9 +131,9 @@ service:
           transform/add_resource_attributes_as_metric_attributes,
           batch,
         ]
-      exporters: [otlphttp/metrics]
+      exporters: [otlphttp]
     traces:
       receivers: [otlp]
       processors:
         [resourcedetection, transform/drop_unneeded_resource_attributes, batch]
-      exporters: [otlphttp/traces]
+      exporters: [otlphttp]
