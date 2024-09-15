@@ -1,4 +1,6 @@
 apiVersion: 1
+foo:
+  - bar: 1
 datasources:
   - name: Loki
     type: loki

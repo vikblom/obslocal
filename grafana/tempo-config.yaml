@@ -45,7 +45,7 @@ storage:
       bucket: tempo-data
       insecure: true
       access_key: s3key
-      secret_key: s3secret
+      secret_key: ${S3_SECRET_KEY}
       forcepathstyle: true
     block:
       bloom_filter_false_positive: .05

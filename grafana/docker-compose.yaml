@@ -5,11 +5,12 @@ networks:
 volumes:
   minio_data:
   caddy_data:
+  grafana_data:
 
 services:
   loki:
     image: grafana/loki:3.0.1
-    command: "-config.file=/etc/loki/config.yaml"
+    command: "-config.expand-env=true -config.file=/etc/loki/config.yaml"
     ports:
       - 3100 # http
       - 9095 # grpc
@@ -23,14 +24,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    labels:
-      logging: promtail
+    environment:
+      - S3_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
     networks:
       - allservices
 
   mimir:
     image: grafana/mimir:2.13.0
-    command: "-config.file=/etc/mimir.yaml"
+    command: "-config.expand-env=true -config.file=/etc/mimir.yaml"
     ports:
       - 3200
       - 9095
@@ -44,15 +45,16 @@ services:
       retries: 5
     deploy:
       replicas: 3
-    labels:
-      logging: promtail
     volumes:
       - ./mimir-config.yaml:/etc/mimir.yaml
+    environment:
+      - S3_SECERT_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
     networks:
       - allservices
 
   tempo:
     image: grafana/tempo:2.5.0
+    command: "-config.expand-env=true -config.file=/etc/tempo.yaml"
     ports:
       - 3300
       - 4317 # grpc ingest
@@ -63,9 +65,10 @@ services:
       # - "14250:14250"
     depends_on:
       - minio
-    command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - "./tempo-config.yaml:/etc/tempo.yaml"
+    environment:
+      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
     networks:
       - allservices
 
@@ -85,7 +88,7 @@ services:
     environment:
       # Use the user/pass as key/secret.
       - MINIO_ROOT_USER=s3key
-      - MINIO_ROOT_PASSWORD=s3secret
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - MINIO_PROMETHEUS_AUTH_TYPE=public
       - MINIO_UPDATE=off
     ports:
@@ -117,31 +120,32 @@ services:
     networks:
       - allservices
 
-  promtail:
-    image: grafana/promtail:2.7.1
-    command: -config.file=/etc/promtail/config.yaml
-    volumes:
-      - ./promtail.yaml:/etc/promtail/config.yaml
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - caddy
-    networks:
-      - allservices
+  # promtail:
+  #   image: grafana/promtail:2.7.1
+  #   command: -config.file=/etc/promtail/config.yaml
+  #   volumes:
+  #     - ./promtail.yaml:/etc/promtail/config.yaml
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - /var/lib/docker/containers:/var/lib/docker/containers
+  #   depends_on:
+  #     - caddy
+  #   networks:
+  #     - allservices
 
-  prometheus:
-    image: prom/prometheus:v2.41.0
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --log.level=info
-      - --storage.tsdb.path=/prometheus
-      - --web.console.libraries=/usr/share/prometheus/console_libraries
-      - --web.console.templates=/usr/share/prometheus/consoles
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    networks:
-      - allservices
+    # prometheus:
+    #   image: prom/prometheus:v2.41.0
+    #   command:
+    #     - --config.file=/etc/prometheus/prometheus.yml
+    #     - --log.level=info
+    #     - --storage.tsdb.path=/prometheus
+    #     - --web.console.libraries=/usr/share/prometheus/console_libraries
+    #     - --web.console.templates=/usr/share/prometheus/consoles
+    #   ports:
+    #     - "9090:9090"
+    #   volumes:
+    #     - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    #   networks:
+    #     - allservices
 
   grafana:
     # 11.2.0 still has
@@ -149,13 +153,12 @@ services:
     image: grafana/grafana:11.2.0
     environment:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-      - GF_USERS_DEFAULT_THEME=light
+      - GF_USERS_DEFAULT_THEME=dark
       - GF_LOG_MODE=console
       - GF_LOG_LEVEL=critical
     volumes:
       - ./grafana.yaml:/etc/grafana/provisioning/datasources/ds.yaml
+      - grafana_data:/var/lib/grafana
     depends_on:
       - caddy
     healthcheck:
@@ -163,8 +166,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    labels:
-      logging: promtail
     ports:
       - "3000:3000"
     networks:

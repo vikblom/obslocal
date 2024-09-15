@@ -19,7 +19,7 @@ common:
       endpoint: minio:9000
       insecure: true
       access_key_id: s3key
-      secret_access_key: s3secret
+      secret_access_key: ${S3_SECERT_ACCESS_KEY}
       bucket_name: mimir-data
 alertmanager:
   external_url: http://localhost:3200/alertmanager
