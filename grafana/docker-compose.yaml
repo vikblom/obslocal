@@ -1,5 +1,5 @@
 networks:
-  allservices:
+  obslocal:
     external: true
 
 volumes:
@@ -27,7 +27,7 @@ services:
     environment:
       - S3_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
     networks:
-      - allservices
+      - obslocal
 
   mimir:
     image: grafana/mimir:2.13.0
@@ -50,7 +50,7 @@ services:
     environment:
       - S3_SECERT_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
     networks:
-      - allservices
+      - obslocal
 
   tempo:
     image: grafana/tempo:2.5.0
@@ -70,7 +70,7 @@ services:
     environment:
       - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
     networks:
-      - allservices
+      - obslocal
 
   # MINIO provides a local s3 API for backing storage.
   minio:
@@ -101,7 +101,7 @@ services:
       timeout: 20s
       retries: 5
     networks:
-      - allservices
+      - obslocal
 
   caddy:
     image: caddy:2-alpine
@@ -118,7 +118,7 @@ services:
       - "3301:3301" # Tempo
       - "3302:3302"
     networks:
-      - allservices
+      - obslocal
 
   # promtail:
   #   image: grafana/promtail:2.7.1
@@ -130,7 +130,7 @@ services:
   #   depends_on:
   #     - caddy
   #   networks:
-  #     - allservices
+  #     - obslocal
 
   prometheus:
     image: prom/prometheus:v2.41.0
@@ -168,4 +168,4 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - allservices
+      - obslocal
