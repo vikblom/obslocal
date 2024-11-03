@@ -132,20 +132,19 @@ services:
   #   networks:
   #     - allservices
 
-    # prometheus:
-    #   image: prom/prometheus:v2.41.0
-    #   command:
-    #     - --config.file=/etc/prometheus/prometheus.yml
-    #     - --log.level=info
-    #     - --storage.tsdb.path=/prometheus
-    #     - --web.console.libraries=/usr/share/prometheus/console_libraries
-    #     - --web.console.templates=/usr/share/prometheus/consoles
-    #   ports:
-    #     - "9090:9090"
-    #   volumes:
-    #     - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    #   networks:
-    #     - allservices
+  prometheus:
+    image: prom/prometheus:v2.41.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --log.level=info
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    network_mode: "host"
+    # ports:
+    #   - "9090:9090"
 
   grafana:
     # 11.2.0 still has
