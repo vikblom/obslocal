@@ -13,9 +13,9 @@ docker network create obslocal
 
 Generate a password for Minio which will be used as storage.
 ```
-echo "export MINIO_ROOT_PASSWORD=$(openssl rand -base64 24)" >> .envrc
-source .envrc
+echo "MINIO_ROOT_PASSWORD=$(openssl rand -base64 24)" >> .env
 ```
+Docker Compose will read the `.env` file for us.
 
 
 ## How to run:

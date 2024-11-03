@@ -24,6 +24,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    env_file: .env
     environment:
       - S3_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
     networks:
@@ -47,6 +48,7 @@ services:
       replicas: 3
     volumes:
       - ./mimir-config.yaml:/etc/mimir.yaml
+    env_file: .env
     environment:
       - S3_SECERT_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
     networks:
@@ -67,6 +69,7 @@ services:
       - minio
     volumes:
       - "./tempo-config.yaml:/etc/tempo.yaml"
+    env_file: .env
     environment:
       - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
     networks:
@@ -85,10 +88,11 @@ services:
         mkdir -p /data/mimir-data && \
         mkdir -p /data/tempo-data && \
         minio server /data
+    env_file: .env
     environment:
       # Use the user/pass as key/secret.
+      # Password from .env.
       - MINIO_ROOT_USER=s3key
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - MINIO_PROMETHEUS_AUTH_TYPE=public
       - MINIO_UPDATE=off
     ports:
