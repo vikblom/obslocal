@@ -1,4 +1,4 @@
-module github.com/vikblom/obslocal/otel
+module github.com/vikblom/obslocal/exampleapp
 
 go 1.23
 

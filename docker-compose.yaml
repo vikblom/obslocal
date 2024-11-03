@@ -147,9 +147,7 @@ services:
     #   - "9090:9090"
 
   grafana:
-    # 11.2.0 still has
-    # https://github.com/grafana/grafana/issues/90430
-    image: grafana/grafana:11.2.0
+    image: grafana/grafana:11.3.0
     environment:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
       - GF_USERS_DEFAULT_THEME=dark
@@ -169,3 +167,13 @@ services:
       - "3000:3000"
     networks:
       - obslocal
+
+  # Open Telemetry Collector is an ingest agent for all three kinds of signals.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.107.0
+    restart: always
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - "./otelc-config.yaml:/etc/otel-collector-config.yaml"
+    # All the ports are visible.
+    network_mode: "host"
