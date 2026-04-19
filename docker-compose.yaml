@@ -10,6 +10,7 @@ volumes:
 services:
   loki:
     image: grafana/loki:3.0.1
+    restart: unless-stopped
     command: "-config.expand-env=true -config.file=/etc/loki/config.yaml"
     ports:
       - 3100 # http
@@ -32,6 +33,7 @@ services:
 
   mimir:
     image: grafana/mimir:2.13.0
+    restart: unless-stopped
     command: "-config.expand-env=true -config.file=/etc/mimir.yaml"
     ports:
       - 3200
@@ -56,6 +58,7 @@ services:
 
   tempo:
     image: grafana/tempo:2.5.0
+    restart: unless-stopped
     command: "-config.expand-env=true -config.file=/etc/tempo.yaml"
     ports:
       - 3300
@@ -78,6 +81,7 @@ services:
   # MINIO provides a local s3 API for backing storage.
   minio:
     image: minio/minio
+    restart: unless-stopped
     # Create the buckets.
     entrypoint:
       - sh
@@ -109,6 +113,7 @@ services:
 
   caddy:
     image: caddy:2-alpine
+    restart: unless-stopped
     volumes:
       - caddy_data:/data
       - ./Caddyfile:/etc/caddy/Caddyfile
@@ -138,6 +143,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.41.0
+    restart: unless-stopped
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --log.level=info
@@ -151,12 +157,13 @@ services:
     #   - "9090:9090"
 
   grafana:
-    image: grafana/grafana:11.3.0
+    image: grafana/grafana:11.6
+    restart: unless-stopped
     environment:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
       - GF_USERS_DEFAULT_THEME=dark
       - GF_LOG_MODE=console
-      - GF_LOG_LEVEL=critical
+      - GF_LOG_LEVEL=error
     volumes:
       - ./grafana.yaml:/etc/grafana/provisioning/datasources/ds.yaml
       - grafana_data:/var/lib/grafana
@@ -175,7 +182,7 @@ services:
   # Open Telemetry Collector is an ingest agent for all three kinds of signals.
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.107.0
-    restart: always
+    restart: unless-stopped
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
       - "./otelc-config.yaml:/etc/otel-collector-config.yaml"
